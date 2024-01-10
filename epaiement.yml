@@ -1,0 +1,117 @@
+version: "3.8"
+secrets:
+  vault_token_secret:
+    external: true
+  vault_addr_secret:
+    external: true
+services:
+  ace3i-epaiement-redis:
+    image: "redis:alpine"
+    ports:
+      - "<port-serveur-redis>:6379"
+    environment:
+      REDIS_PASSWORD: "<mot-de-passe-serveur-redis>"
+  ace3i-epaiement-ui:
+    image: nexus.ace3i.com:5000/ace3i-epaiement-ui:2.12.8-SNAPSHOT-latest
+    environment:
+      - APP_BASEURL=\/backend
+      - APP_CONNECTORSEGUCEBASEURL=\/seguce
+      - APP_CONNECTORTOGOCOMBASEURL=\/mbanking
+      - APP_I18NCUSTOMPATH=\/
+      - APP_PRIMARYCOLOR=#303f9f
+      - APP_SECONDARYCOLOR=#424242
+      - APP_ACCENTCOLOR=#ff8400
+      - APP_LIGHTCOLOR=#FFFFFF
+      - APP_LOGOH=75px
+      - APP_LOGOW=75px
+    extra_hosts:
+      - "ace3i-epaiement-core:<adresse-epaiement-core>"
+      - "ace3i-connector-amplitude:<adresse-connecteur-amplitude>"
+      - "ace3i-connector-iso20022:<adresse-connecteur-iso20022>"
+      - "ace3i-connector-otr:<adresse-connecteur-otr>"
+      - "ace3i-connector-seguce:<adresse-connecteur-seguce>"
+      - "ace3i-connector-paygate:<adresse-connecteur-paygate>"
+      - "ace3i-connector-togocom:<adresse-connecteur-togocom>"
+      - "ace3i-connector-ceet:<adresse-connecteur-ceet>"
+    depends_on:
+      - ace3i-epaiement-core
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1024k"
+        max-file: "10"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/app/ace3i-epaiement-ui/logs:/var/log/nginx/"
+# Décommenter la ligne ci-dessous pour personnaliser la configuration du service nginx
+#      - "/app/ace3i-epaiement-ui/nginx.conf:/etc/nginx/nginx.conf"
+# Décommenter la ligne ci-dessous pour personnaliser le favicon
+#      - "/app/ace3i-epaiement-ui/favicon.ico:/usr/share/nginx/html/assets/img/favicon.ico"
+# Décommenter la ligne ci-dessous pour personnaliser le logo
+#      - "/app/ace3i-epaiement-ui/logo.png:/usr/share/nginx/html/assets/img/logo.png"
+# Décommenter la ligne ci-dessous pour personnaliser le fond de connexion
+#      - "/app/ace3i-epaiement-ui/bg-loginBox.png:/usr/share/nginx/html/assets/img/bg-loginBox.png"
+# Décommenter les deux lignes ci-dessous pour personnaliser le certificat ssl et sa clé
+#      - "/app/ace3i-epaiement-ui/certs/cert.crt:/app/ssl/ace3i-epaiement-ui.crt"
+#      - "/app/ace3i-epaiement-ui/certs/key.key:/app/ssl/ace3i-epaiement-key.key"
+  ace3i-epaiement-core:
+    image: nexus.ace3i.com:5000/ace3i-epaiement-core:2.12.7-SNAPSHOT-latest
+    environment:
+      - VAULT_TOKEN_FILE=/run/secrets/vault_token_secret
+      - VAULT_ADDR_FILE=/run/secrets/vault_addr_secret
+    secrets:
+      - vault_token_secret
+      - vault_addr_secret
+    extra_hosts:
+      - "vault:<adresse-serveur-vault>"
+      - "ace3i-maildev:<adresse-serveur-mail>"
+      - "ace3i-connector-amplitude:<adresse-connecteur-amplitude>"
+      - "ace3i-connector-iso20022:<adresse-connecteur-iso20022>"
+      - "ace3i-connector-otr:<adresse-connecteur-otr>"
+      - "ace3i-connector-seguce:<adresse-connecteur-seguce>"
+      - "ace3i-connector-paygate:<adresse-connecteur-paygate>"
+      - "ace3i-connector-togocom:<adresse-connecteur-togocom>"
+      - "ace3i-connector-moov:<adresse-connecteur-moov>"
+    ports:
+      - "8090:8080"
+    volumes:
+      - type: bind
+        source: /app/ace3i-epaiement-core/client/input
+        target: /home/ace3i/load/input
+      - type: bind
+        source: /app/ace3i-epaiement-core/client/output
+        target: /home/ace3i/load/processed
+      - type: bind
+        source: /app/ace3i-epaiement-core/export/output
+        target: /home/ace3i/.epaiement-online/export/ouput
+      - type: bind
+        source: /app/ace3i-epaiement-core/export/processed
+        target: /home/ace3i/.epaiement-online/export/processed
+      - type: bind
+        source: /app/ace3i-epaiement-core/reconciliation/input
+        target: /home/ace3i/load/reconciliation/input
+      - type: bind
+        source: /app/ace3i-epaiement-core/reconciliation/processed
+        target: /home/ace3i/load/reconciliation/processed
+      - "/app/ace3i-epaiement-core/logs:/home/ace3i/.epaiement-online/logs"
+# Décommenter la ligne ci-dessous pour personnaliser le logo des bordereaux
+#      - "/app/ace3i-epaiement-core/logo.png:/home/ace3i/.epaiement-online/images/logo.png"
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1024k"
+        max-file: "10"
